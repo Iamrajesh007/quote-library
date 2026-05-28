@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Quote Library</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #faf9f7; --surface: #ffffff; --surface2: #f4f2ee;
+    --border: rgba(0,0,0,0.10); --border-md: rgba(0,0,0,0.18);
+    --text: #1a1a18; --text2: #5f5e5a; --text3: #888780;
+    --accent: #185fa5; --star: #BA7517;
+    --radius-md: 8px; --radius-lg: 12px; --radius-xl: 16px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #18181a; --surface: #222224; --surface2: #2a2a2c;
+      --border: rgba(255,255,255,0.10); --border-md: rgba(255,255,255,0.18);
+      --text: #f0ede8; --text2: #b4b2a9; --text3: #888780; --accent: #85b7eb;
+    }
+  }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+  .container { max-width: 860px; margin: 0 auto; padding: 2rem 1.25rem 4rem; }
+
+  /* Header */
+  .header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 2rem; flex-wrap: wrap; gap: 12px; }
+  .logo { display: flex; align-items: center; gap: 10px; }
+  .logo-icon { width: 38px; height: 38px; background: var(--surface2); border: 0.5px solid var(--border-md); border-radius: var(--radius-md); display: flex; align-items: center; justify-content: center; color: var(--text2); font-size: 18px; }
+  .logo-text h1 { font-size: 18px; font-weight: 600; color: var(--text); }
+  .logo-text span { font-size: 12px; color: var(--text3); }
+  .header-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+  /* Sync indicator */
+  .sync-dot { width: 7px; height: 7px; border-radius: 50%; background: #22c55e; display: inline-block; margin-right: 5px; }
+  .sync-dot.syncing { background: var(--star); animation: pulse 1s infinite; }
+  .sync-dot.error { background: #ef4444; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+  /* Buttons */
+  .btn { padding: 8px 14px; font-size: 13px; border: 0.5px solid var(--border-md); border-radius: var(--radius-md); cursor: pointer; background: var(--surface); color: var(--text); display: inline-flex; align-items: center; gap: 6px; transition: background 0.15s, opacity 0.15s; font-family: inherit; }
+  .btn:hover { background: var(--surface2); }
+  .btn-primary { background: var(--text); color: var(--bg); border-color: var(--text); }
+  .btn-primary:hover { opacity: 0.82; background: var(--text); }
+
+  /* Stats */
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; margin-bottom: 1.75rem; }
+  .stat { background: var(--surface2); border-radius: var(--radius-md); padding: 14px 16px; }
+  .stat-label { font-size: 11px; color: var(--text3); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.04em; }
+  .stat-val { font-size: 24px; font-weight: 600; color: var(--text); }
+
+  /* Controls */
+  .controls { display: flex; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; align-items: center; }
+  .search-wrap { flex: 1; min-width: 180px; position: relative; }
+  .search-wrap i { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); font-size: 15px; color: var(--text3); pointer-events: none; }
+  .search-wrap input { width: 100%; padding: 8px 10px 8px 32px; font-size: 13px; border: 0.5px solid var(--border-md); border-radius: var(--radius-md); background: var(--surface); color: var(--text); font-family: inherit; }
+  .filter-select { padding: 8px 12px; font-size: 13px; border: 0.5px solid var(--border-md); border-radius: var(--radius-md); background: var(--surface); color: var(--text); cursor: pointer; font-family: inherit; }
+  .search-wrap input:focus, .filter-select:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+  /* Sort chips */
+  .sort-row { display: flex; align-items: center; gap: 8px; margin-bottom: 1.25rem; flex-wrap: wrap; }
+  .sort-label { font-size: 12px; color: var(--text3); }
+  .chip { padding: 4px 12px; border-radius: 99px; font-size: 12px; border: 0.5px solid var(--border-md); cursor: pointer; background: var(--surface); color: var(--text2); transition: all 0.15s; font-family: inherit; }
+  .chip.active { background: var(--text); color: var(--bg); border-color: var(--text); }
+
+  /* Quote cards */
+  .quotes-grid { display: flex; flex-direction: column; gap: 10px; }
+  .section-header { font-size: 11px; font-weight: 600; color: var(--text3); text-transform: uppercase; letter-spacing: 0.06em; padding: 8px 0 4px; margin-top: 8px; border-top: 0.5px solid var(--border); }
+  .section-header:first-child { border-top: none; margin-top: 0; }
+  .quote-card { background: var(--surface); border: 0.5px solid var(--border); border-radius: var(--radius-lg); padding: 1rem 1.25rem; transition: border-color 0.15s; }
+  .quote-card:hover { border-color: var(--border-md); }
+  .quote-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 10px; }
+  .quote-text { font-size: 15px; color: var(--text); line-height: 1.65; font-style: italic; flex: 1; }
+  .quote-actions { display: flex; gap: 4px; flex-shrink: 0; }
+  .icon-btn { background: none; border: none; cursor: pointer; padding: 5px; color: var(--text3); border-radius: 6px; display: flex; transition: color 0.1s, background 0.1s; }
+  .icon-btn:hover { color: var(--text); background: var(--surface2); }
+  .quote-meta { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .author-name { font-size: 13px; font-weight: 600; color: var(--text); }
+  .theme-badge { font-size: 11px; padding: 3px 10px; border-radius: 99px; font-weight: 500; }
+  .stars { display: flex; gap: 1px; }
+  .star { font-size: 13px; color: var(--text3); }
+  .star.on { color: var(--star); }
+  .quote-note { margin-top: 8px; font-size: 12px; color: var(--text2); border-top: 0.5px solid var(--border); padding-top: 8px; line-height: 1.5; }
+  .empty-state { text-align: center; padding: 4rem 1rem; color: var(--text3); font-size: 14px; }
+  .empty-state i { font-size: 32px; display: block; margin-bottom: 10px; }
+
+  /* Loading overlay */
+  .loading-overlay { position: fixed; inset: 0; background: var(--bg); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 300; gap: 14px; }
+  .loading-overlay.hidden { display: none; }
+  .spinner { width: 32px; height: 32px; border: 2px solid var(--border-md); border-top-color: var(--text); border-radius: 50%; animation: spin 0.7s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .loading-overlay p { font-size: 14px; color: var(--text2); }
+
+  /* Modal */
+  .modal-bg { position: fixed; inset: 0; background: rgba(0,0,0,0.45); display: flex; align-items: center; justify-content: center; z-index: 100; padding: 1rem; }
+  .modal-bg.hidden { display: none; }
+  .modal { background: var(--surface); border-radius: var(--radius-xl); border: 0.5px solid var(--border-md); padding: 1.5rem; width: 100%; max-width: 480px; max-height: 90vh; overflow-y: auto; }
+  .modal-title { font-size: 16px; font-weight: 600; margin-bottom: 1.25rem; color: var(--text); }
+  .form-group { margin-bottom: 1rem; }
+  .form-group label { display: block; font-size: 12px; color: var(--text2); margin-bottom: 5px; font-weight: 500; }
+  .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 8px 12px; font-size: 14px; border: 0.5px solid var(--border-md); border-radius: var(--radius-md); background: var(--bg); color: var(--text); font-family: inherit; }
+  .form-group input:focus, .form-group select:focus, .form-group textarea:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .form-group textarea { resize: vertical; min-height: 80px; line-height: 1.5; }
+  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .star-input { display: flex; gap: 4px; margin-top: 6px; }
+  .star-input span { font-size: 24px; cursor: pointer; color: var(--text3); transition: color 0.1s; user-select: none; }
+  .star-input span.on { color: var(--star); }
+  .modal-footer { display: flex; justify-content: flex-end; gap: 8px; margin-top: 1.25rem; padding-top: 1rem; border-top: 0.5px solid var(--border); }
+
+  /* Toast */
+  .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(80px); background: var(--text); color: var(--bg); padding: 10px 20px; border-radius: 99px; font-size: 13px; font-weight: 500; transition: transform 0.3s; z-index: 200; white-space: nowrap; pointer-events: none; }
+  .toast.show { transform: translateX(-50%) translateY(0); }
+</style>
+</head>
+<body>
+
+<!-- Loading screen -->
+<div class="loading-overlay" id="loading-overlay">
+  <div class="spinner"></div>
+  <p>Connecting to cloud…</p>
+</div>
+
+<div class="container">
+  <div class="header">
+    <div class="logo">
+      <div class="logo-icon"><i class="ti ti-quote"></i></div>
+      <div class="logo-text">
+        <h1>Quote Library</h1>
+        <span id="sync-status"><span class="sync-dot" id="sync-dot"></span><span id="sync-label">Connected</span></span>
+      </div>
+    </div>
+    <div class="header-actions">
+      <button class="btn" onclick="exportPDF()"><i class="ti ti-file-text"></i> Export PDF</button>
+      <button class="btn btn-primary" onclick="openAddModal()"><i class="ti ti-plus"></i> Add quote</button>
+    </div>
+  </div>
+
+  <div class="stats">
+    <div class="stat"><div class="stat-label">Total quotes</div><div class="stat-val" id="s-total">—</div></div>
+    <div class="stat"><div class="stat-label">Themes</div><div class="stat-val" id="s-themes">—</div></div>
+    <div class="stat"><div class="stat-label">Authors</div><div class="stat-val" id="s-authors">—</div></div>
+    <div class="stat"><div class="stat-label">Avg. impact</div><div class="stat-val" id="s-avg">—</div></div>
+  </div>
+
+  <div class="controls">
+    <div class="search-wrap">
+      <i class="ti ti-search"></i>
+      <input type="text" id="search-input" placeholder="Search quotes or authors…" oninput="renderQuotes()">
+    </div>
+    <select class="filter-select" id="filter-theme" onchange="renderQuotes()"><option value="">All themes</option></select>
+    <select class="filter-select" id="filter-author" onchange="renderQuotes()"><option value="">All authors</option></select>
+    <select class="filter-select" id="filter-impact" onchange="renderQuotes()">
+      <option value="">Any impact</option>
+      <option value="5">★★★★★ only</option>
+      <option value="4">★★★★+</option>
+      <option value="3">★★★+</option>
+    </select>
+  </div>
+
+  <div class="sort-row">
+    <span class="sort-label">Sort by:</span>
+    <button class="chip active" onclick="setSort('date',this)">Date added</button>
+    <button class="chip" onclick="setSort('impact',this)">Impact</button>
+    <button class="chip" onclick="setSort('author',this)">Author</button>
+    <button class="chip" onclick="setSort('theme',this)">Theme</button>
+  </div>
+
+  <div class="quotes-grid" id="quotes-grid"></div>
+</div>
+
+<!-- Add/Edit Modal -->
+<div class="modal-bg hidden" id="add-modal">
+  <div class="modal">
+    <div class="modal-title" id="modal-title">Add a new quote</div>
+    <div class="form-group">
+      <label>Quote text *</label>
+      <textarea id="f-text" placeholder="Enter the quote…"></textarea>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Author *</label>
+        <input type="text" id="f-author" placeholder="e.g. Nelson Mandela">
+      </div>
+      <div class="form-group">
+        <label>Theme *</label>
+        <select id="f-theme">
+          <option value="">Select theme…</option>
+          <option>Leadership</option><option>Perseverance</option><option>Creativity</option>
+          <option>Growth</option><option>Resilience</option><option>Success</option>
+          <option>Wisdom</option><option>Courage</option><option>Mindset</option><option>Purpose</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-group">
+      <label>Impact score</label>
+      <div class="star-input" id="star-input">
+        <span onclick="setStar(1)">☆</span><span onclick="setStar(2)">☆</span>
+        <span onclick="setStar(3)">☆</span><span onclick="setStar(4)">☆</span><span onclick="setStar(5)">☆</span>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Source / book</label>
+        <input type="text" id="f-source" placeholder="e.g. Long Walk to Freedom">
+      </div>
+      <div class="form-group">
+        <label>Personal note</label>
+        <input type="text" id="f-note" placeholder="Why does this resonate?">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" id="save-btn" onclick="saveQuote()">Save quote</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<!-- Firebase -->
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, serverTimestamp, query, orderBy } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyCg-1O7sRaXkGUDHiTIhTgB8lH98Fdh18U",
+  authDomain: "quotelibrary-f2178.firebaseapp.com",
+  projectId: "quotelibrary-f2178",
+  storageBucket: "quotelibrary-f2178.firebasestorage.app",
+  messagingSenderId: "81663295123",
+  appId: "1:81663295123:web:1de3e516eb9605c7da1766",
+  measurementId: "G-VC4B2NK9DB"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+const COLL = "quotes";
+
+const THEME_COLORS = {
+  Leadership:  {bg:'#dbeafe',tx:'#1e40af'}, Perseverance:{bg:'#fee2e2',tx:'#991b1b'},
+  Creativity:  {bg:'#ede9fe',tx:'#5b21b6'}, Growth:      {bg:'#dcfce7',tx:'#166534'},
+  Resilience:  {bg:'#fef3c7',tx:'#92400e'}, Success:     {bg:'#d1fae5',tx:'#065f46'},
+  Wisdom:      {bg:'#f3f4f6',tx:'#374151'}, Courage:     {bg:'#fce7f3',tx:'#9d174d'},
+  Mindset:     {bg:'#ffedd5',tx:'#9a3412'}, Purpose:     {bg:'#e0f2fe',tx:'#075985'},
+};
+
+const SEED = [
+  {text:"It always seems impossible until it's done.",author:"Nelson Mandela",theme:"Perseverance",impact:5,source:"Long Walk to Freedom",note:"Perfect for tough exam prep days"},
+  {text:"The only way to do great work is to love what you do.",author:"Steve Jobs",theme:"Purpose",impact:5,source:"Stanford Commencement",note:""},
+  {text:"In the middle of every difficulty lies opportunity.",author:"Albert Einstein",theme:"Resilience",impact:4,source:"",note:"Remember during tough mock tests"},
+  {text:"Leadership is not about being in charge. It is about taking care of those in your charge.",author:"Simon Sinek",theme:"Leadership",impact:5,source:"Start With Why",note:""},
+  {text:"Creativity is intelligence having fun.",author:"Albert Einstein",theme:"Creativity",impact:4,source:"",note:""},
+  {text:"Small daily improvements are the key to staggering long-term results.",author:"Robin Sharma",theme:"Growth",impact:5,source:"The 5 AM Club",note:"Track daily study hours"},
+];
+
+let quotes = [], editId = null, currentStar = 3, sortMode = 'date';
+let seeded = false;
+
+function setSyncStatus(state) {
+  const dot = document.getElementById('sync-dot');
+  const label = document.getElementById('sync-label');
+  dot.className = 'sync-dot' + (state === 'syncing' ? ' syncing' : state === 'error' ? ' error' : '');
+  label.textContent = state === 'syncing' ? 'Saving…' : state === 'error' ? 'Offline' : 'Cloud synced';
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2200);
+}
+
+// Real-time listener — updates UI whenever Firestore changes
+const q = query(collection(db, COLL), orderBy("createdAt", "desc"));
+onSnapshot(q, async (snap) => {
+  document.getElementById('loading-overlay').classList.add('hidden');
+  if (snap.empty && !seeded) {
+    seeded = true;
+    for (const s of SEED) {
+      await addDoc(collection(db, COLL), { ...s, createdAt: serverTimestamp() });
+    }
+    return;
+  }
+  quotes = snap.docs.map(d => ({ id: d.id, ...d.data(), createdAt: d.data().createdAt?.toDate() || new Date() }));
+  renderAll();
+}, (err) => {
+  document.getElementById('loading-overlay').classList.add('hidden');
+  setSyncStatus('error');
+  console.error(err);
+});
+
+function renderAll() { updateStats(); updateFilters(); renderQuotes(); }
+
+function updateStats() {
+  const themes = new Set(quotes.map(q => q.theme)).size;
+  const authors = new Set(quotes.map(q => q.author)).size;
+  const avg = quotes.length ? quotes.reduce((a, q) => a + q.impact, 0) / quotes.length : 0;
+  document.getElementById('s-total').textContent = quotes.length;
+  document.getElementById('s-themes').textContent = themes;
+  document.getElementById('s-authors').textContent = authors;
+  document.getElementById('s-avg').textContent = quotes.length ? avg.toFixed(1) + '★' : '—';
+}
+
+function updateFilters() {
+  const themes = [...new Set(quotes.map(q => q.theme))].sort();
+  const authors = [...new Set(quotes.map(q => q.author))].sort();
+  const tf = document.getElementById('filter-theme'), af = document.getElementById('filter-author');
+  const tv = tf.value, av = af.value;
+  tf.innerHTML = '<option value="">All themes</option>' + themes.map(t => `<option${tv===t?' selected':''}>${t}</option>`).join('');
+  af.innerHTML = '<option value="">All authors</option>' + authors.map(a => `<option${av===a?' selected':''}>${a}</option>`).join('');
+}
+
+function getFiltered() {
+  const search = document.getElementById('search-input').value.toLowerCase();
+  const theme = document.getElementById('filter-theme').value;
+  const author = document.getElementById('filter-author').value;
+  const impact = parseInt(document.getElementById('filter-impact').value) || 0;
+  return quotes.filter(q => {
+    if (search && !q.text.toLowerCase().includes(search) && !q.author.toLowerCase().includes(search)) return false;
+    if (theme && q.theme !== theme) return false;
+    if (author && q.author !== author) return false;
+    if (impact && q.impact < impact) return false;
+    return true;
+  });
+}
+
+function getSorted(list) {
+  return [...list].sort((a, b) => {
+    if (sortMode === 'date') return (b.createdAt||0) - (a.createdAt||0);
+    if (sortMode === 'impact') return b.impact - a.impact;
+    if (sortMode === 'author') return a.author.localeCompare(b.author);
+    if (sortMode === 'theme') return a.theme.localeCompare(b.theme);
+    return 0;
+  });
+}
+
+window.renderQuotes = function() {
+  const list = getSorted(getFiltered());
+  const grid = document.getElementById('quotes-grid');
+  if (!list.length) { grid.innerHTML = '<div class="empty-state"><i class="ti ti-mood-empty"></i>No quotes match your filters</div>'; return; }
+  let html = '', lastGroup = '';
+  if (sortMode === 'theme' || sortMode === 'author') {
+    const key = sortMode;
+    list.forEach(q => {
+      const g = q[key];
+      if (g !== lastGroup) { html += `<div class="section-header">${g}</div>`; lastGroup = g; }
+      html += cardHTML(q);
+    });
+  } else { html = list.map(cardHTML).join(''); }
+  grid.innerHTML = html;
+};
+
+function cardHTML(q) {
+  const c = THEME_COLORS[q.theme] || {bg:'#f3f4f6',tx:'#374151'};
+  const stars = Array.from({length:5}, (_,i) => `<span class="star${i<q.impact?' on':''}">${i<q.impact?'★':'☆'}</span>`).join('');
+  return `<div class="quote-card">
+    <div class="quote-top">
+      <div class="quote-text">"${q.text}"</div>
+      <div class="quote-actions">
+        <button class="icon-btn" onclick="editQuote('${q.id}')" title="Edit"><i class="ti ti-edit" style="font-size:15px"></i></button>
+        <button class="icon-btn" onclick="deleteQuote('${q.id}')" title="Delete"><i class="ti ti-trash" style="font-size:15px"></i></button>
+      </div>
+    </div>
+    <div class="quote-meta">
+      <span class="author-name">— ${q.author}</span>
+      <span class="theme-badge" style="background:${c.bg};color:${c.tx}">${q.theme}</span>
+      <div class="stars">${stars}</div>
+      ${q.source ? `<span style="font-size:12px;color:var(--text3)"><i class="ti ti-book" style="font-size:12px;vertical-align:-2px"></i> ${q.source}</span>` : ''}
+    </div>
+    ${q.note ? `<div class="quote-note"><i class="ti ti-note" style="font-size:12px;vertical-align:-1px"></i> ${q.note}</div>` : ''}
+  </div>`;
+}
+
+window.setSort = function(mode, el) {
+  sortMode = mode;
+  document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+  el.classList.add('active');
+  renderQuotes();
+};
+
+window.setStar = function(v) {
+  currentStar = v;
+  document.querySelectorAll('#star-input span').forEach((s, i) => {
+    s.textContent = i < v ? '★' : '☆';
+    s.classList.toggle('on', i < v);
+  });
+};
+
+window.openAddModal = function() {
+  editId = null; currentStar = 3;
+  document.getElementById('modal-title').textContent = 'Add a new quote';
+  document.getElementById('save-btn').textContent = 'Save quote';
+  ['f-text','f-author','f-source','f-note'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('f-theme').value = '';
+  setStar(3);
+  document.getElementById('add-modal').classList.remove('hidden');
+  setTimeout(() => document.getElementById('f-text').focus(), 50);
+};
+
+window.editQuote = function(id) {
+  const q = quotes.find(x => x.id === id); if (!q) return;
+  editId = id;
+  document.getElementById('modal-title').textContent = 'Edit quote';
+  document.getElementById('save-btn').textContent = 'Update quote';
+  document.getElementById('f-text').value = q.text;
+  document.getElementById('f-author').value = q.author;
+  document.getElementById('f-theme').value = q.theme;
+  document.getElementById('f-source').value = q.source || '';
+  document.getElementById('f-note').value = q.note || '';
+  setStar(q.impact);
+  document.getElementById('add-modal').classList.remove('hidden');
+};
+
+window.closeModal = function() { document.getElementById('add-modal').classList.add('hidden'); };
+
+window.saveQuote = async function() {
+  const text = document.getElementById('f-text').value.trim();
+  const author = document.getElementById('f-author').value.trim();
+  const theme = document.getElementById('f-theme').value;
+  if (!text || !author || !theme) { alert('Please fill in quote, author, and theme.'); return; }
+  const source = document.getElementById('f-source').value.trim();
+  const note = document.getElementById('f-note').value.trim();
+  setSyncStatus('syncing');
+  try {
+    if (editId) {
+      await updateDoc(doc(db, COLL, editId), { text, author, theme, impact: currentStar||3, source, note });
+      showToast('Quote updated ✓');
+    } else {
+      await addDoc(collection(db, COLL), { text, author, theme, impact: currentStar||3, source, note, createdAt: serverTimestamp() });
+      showToast('Quote saved to cloud ✓');
+    }
+    setSyncStatus('ok');
+  } catch(e) { setSyncStatus('error'); showToast('Save failed — check connection'); }
+  closeModal();
+};
+
+window.deleteQuote = async function(id) {
+  if (!confirm('Delete this quote?')) return;
+  setSyncStatus('syncing');
+  try {
+    await deleteDoc(doc(db, COLL, id));
+    setSyncStatus('ok'); showToast('Quote deleted');
+  } catch(e) { setSyncStatus('error'); showToast('Delete failed'); }
+};
+
+window.exportPDF = function() {
+  const {jsPDF} = window.jspdf;
+  const doc = new jsPDF({orientation:'portrait', unit:'mm', format:'a4'});
+  const sorted = [...quotes].sort((a,b) => a.theme.localeCompare(b.theme) || a.author.localeCompare(b.author));
+  const W = 210, margin = 20, maxW = W - margin * 2;
+  doc.setFillColor(248,246,241);
+  doc.rect(0,0,W,48,'F');
+  doc.setFont('helvetica','bold'); doc.setFontSize(24); doc.setTextColor(26,26,24);
+  doc.text('Quote Library', margin, 24);
+  doc.setFont('helvetica','normal'); doc.setFontSize(10); doc.setTextColor(95,94,90);
+  const exportDate = new Date().toLocaleDateString('en-IN',{day:'numeric',month:'long',year:'numeric'});
+  doc.text(`Personal reference manual · ${quotes.length} quotes · ${new Set(quotes.map(q=>q.theme)).size} themes · ${exportDate}`, margin, 33);
+  doc.setDrawColor(180,178,169); doc.setLineWidth(0.3); doc.line(margin,42,W-margin,42);
+  let y = 55, lastTheme = '';
+  sorted.forEach(q => {
+    if (q.theme !== lastTheme) {
+      if (y > 252) { doc.addPage(); y = 20; }
+      if (lastTheme) y += 5;
+      doc.setFillColor(219,234,254); doc.roundedRect(margin, y-5, maxW, 11, 2, 2, 'F');
+      doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(30,64,175);
+      doc.text(q.theme.toUpperCase(), margin+5, y+3);
+      y += 14; lastTheme = q.theme;
+    }
+    const lines = doc.splitTextToSize(`"${q.text}"`, maxW - 10);
+    const authorLine = `— ${q.author}${q.source ? ' · ' + q.source : ''}`;
+    const stars = '★'.repeat(q.impact) + '☆'.repeat(5 - q.impact);
+    const noteLines = q.note ? doc.splitTextToSize('Note: ' + q.note, maxW - 10) : [];
+    const blockH = lines.length * 5.2 + (noteLines.length ? noteLines.length * 4.2 + 3 : 0) + 16;
+    if (y + blockH > 280) { doc.addPage(); y = 20; }
+    doc.setDrawColor(186,117,23); doc.setLineWidth(0.6);
+    doc.line(margin, y, margin, y + blockH - 5);
+    doc.setFont('helvetica','italic'); doc.setFontSize(10.5); doc.setTextColor(26,26,24);
+    doc.text(lines, margin+7, y+5);
+    y += lines.length * 5.2 + 6;
+    doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(60,60,58);
+    doc.text(authorLine, margin+7, y);
+    doc.setFont('helvetica','normal'); doc.setFontSize(10); doc.setTextColor(186,117,23);
+    doc.text(stars, W - margin - 22, y);
+    y += 5;
+    if (q.note) {
+      doc.setFont('helvetica','italic'); doc.setFontSize(8.5); doc.setTextColor(100,100,95);
+      doc.text(noteLines, margin+7, y);
+      y += noteLines.length * 4.2 + 2;
+    }
+    y += 9;
+  });
+  const pages = doc.internal.getNumberOfPages();
+  for (let p = 1; p <= pages; p++) {
+    doc.setPage(p); doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(150,150,148);
+    doc.text(`Page ${p} of ${pages}`, W/2, 292, {align:'center'});
+  }
+  doc.save('quote-library.pdf');
+  showToast('PDF downloaded ✓');
+};
+
+document.getElementById('add-modal').addEventListener('click', function(e) { if (e.target === this) closeModal(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+</script>
+</body>
+</html>
